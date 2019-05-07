@@ -121,7 +121,7 @@ int main(void)
   printf("system boot success.\n");
   /* USER CODE END 2 */
   /* Infinite loop */
-  uint8_t str[100] = {0};
+  uint8_t str[1024] = {0};
   uint8_t len;
   /* USER CODE BEGIN WHILE */
   while (1)

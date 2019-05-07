@@ -1,10 +1,62 @@
 #include "hmi_driver.h"
 #include "usart.h"
 #include "utility.h"
+#include <stdlib.h>
 // #include "crc16.h"
 
+//group1
+float phase = 0;
+float voltage = 0;
+quint8 ctrl = 0;
+//frame args
 #define FRAME_HEAD 0XEE
 #define FRAME_TAIL 0XFFFCFFFF
+
+//com args
+#define NOTIFY_TOUCH_PRESS 0X01       //触摸屏按下通知
+#define NOTIFY_TOUCH_RELEASE 0X03     //触摸屏松开通知
+#define NOTIFY_WRITE_FLASH_OK 0X0C    //写FLASH成功
+#define NOTIFY_WRITE_FLASH_FAILD 0X0D //写FLASH失败
+#define NOTIFY_READ_FLASH_OK 0X0B     //读FLASH成功
+#define NOTIFY_READ_FLASH_FAILD 0X0F  //读FLASH失败
+#define NOTIFY_MENU 0X14              //菜单事件通知
+#define NOTIFY_TIMER 0X43             //定时器超时通知
+#define NOTIFY_CONTROL 0XB1           //控件更新通知
+#define NOTIFY_READ_RTC 0XF7          //读取RTC时间
+#define MSG_GET_CURRENT_SCREEN 0X01   //画面ID变化通知
+#define MSG_GET_DATA 0X11             //控件数据通知
+#define NOTIFY_HandShake 0X55         //握手通知
+
+//wedget type
+enum CtrlType
+{
+    kCtrlUnknown = 0x00,
+    kCtrlButton = 0x10, //按钮
+    kCtrlText,          //文本
+    kCtrlProgress,      //进度条
+    kCtrlSlider,        //滑动条
+    kCtrlMeter,         //仪表
+    kCtrlDropList,      //下拉列表
+    kCtrlAnimation,     //动画
+    kCtrlRTC,           //时间显示
+    kCtrlGraph,         //曲线图控件
+    kCtrlTable,         //表格控件
+    kCtrlMenu,          //菜单控件
+    kCtrlSelector,      //选择控件
+    kCtrlQRCode,        //二维码
+};
+
+//message prase
+typedef struct _msg_type
+{
+    quint8 _head;
+    quint16 _cmd_type;
+    quint16 _screen_id;
+    quint16 _widget_id;
+    quint8 _widget_type;
+    quint8 _msg[MAX_MSG_LENGTH];
+    quint32 _tail;
+} Hmi_msg;
 /********************************************************************************/
 extern UART_HandleTypeDef huart3;
 #define pserialPort (&huart3)
@@ -64,9 +116,61 @@ quint16 queue_find_frame(Queue *queue, quint8 *frame)
     return 0;
 }
 
+static void hmi_button_press(const Hmi_msg msg_t)
+{
+    switch (msg_t._screen_id)
+    {
+    case 0:
+        if (msg_t._widget_id == 3)
+        {
+            if (msg_t._msg[1])
+            { //按钮按下
+                ctrl = 1;
+                printf("output enable.\n");
+            }
+            else
+            { //按钮弹起
+                ctrl = 0;
+                printf("output disable.\n");
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+static void hmi_text_set(const Hmi_msg msg_t)
+{
+    switch (msg_t._screen_id)
+    {
+    case 0:
+        if (msg_t._widget_id == 1)
+        {
+            voltage = atof(msg_t._msg);
+#if DEBUG
+            printf("voltage = %.2lf V\n", voltage);
+#endif
+        }
+        else if (msg_t._widget_id == 2)
+        {
+            phase = atof(msg_t._msg);
+#if DEBUG
+            printf("phase = %.2f deg\n", phase);
+#endif
+        }
+
+        break;
+
+    default:
+        break;
+    }
+}
+
 static void process_notify(const Hmi_msg msg_t)
 {
-    if (GET_LOW_8BITS(msg_t._cmd_type)==MSG_GET_CURRENT_SCREEN)//屏幕切换通知
+    if (GET_LOW_8BITS(msg_t._cmd_type) == MSG_GET_CURRENT_SCREEN) //屏幕切换通知
     {
         printf("change screen\n");
     }
@@ -76,34 +180,33 @@ static void process_notify(const Hmi_msg msg_t)
         switch (msg_t._widget_type)
         {
         case kCtrlButton: //按钮控件
-            printf("kCtrlButton\n");
+            hmi_button_press(msg_t);
             break;
         case kCtrlText: //文本控件
-            printf("kCtrlText\n");
+            hmi_text_set(msg_t);
             break;
         case kCtrlProgress: //进度条控件
-            
+
             break;
         case kCtrlSlider: //滑动条控件
-            
+
             break;
         case kCtrlMeter: //仪表控件
-            
+
             break;
         case kCtrlMenu: //菜单控件
-            
+
             break;
         case kCtrlSelector: //选择控件
-            
+
             break;
         case kCtrlRTC: //倒计时控件
-            
+
             break;
         default:
             break;
         }
     }
-    
 }
 
 void process(quint8 *msg, const quint16 len)
@@ -121,19 +224,20 @@ void process(quint8 *msg, const quint16 len)
     }
     msg_t._tail = GET_32BITS(msg[len - 4], msg[len - 3], msg[len - 2], msg[len - 1]);
     /************************************************************************************************/
-
-    // printf(" msg_t._head = %x\n", msg_t._head);
-    // printf(" msg_t._cmd_type = %x\n", msg_t._cmd_type);
-    // printf(" msg_t._screen_id = %x\n", msg_t._screen_id);
-    // printf(" msg_t._widget_id = %x\n", msg_t._widget_id);
-    // printf(" msg_t._widget_type = %x\n", msg_t._widget_type);
-    // printf("msg_t._msg[%d] = ", len - 12);
-    // for (int i = 0; i < (len - 12); i++)
-    // {
-    //     printf("%x ", msg_t._msg[i]);
-    // }
-    // printf("\n");
-    // printf(" msg_t._tail = %lx\n", msg_t._tail);
+#if DEBUG
+    printf(" msg_t._head = %x\n", msg_t._head);
+    printf(" msg_t._cmd_type = %x\n", msg_t._cmd_type);
+    printf(" msg_t._screen_id = %x\n", msg_t._screen_id);
+    printf(" msg_t._widget_id = %x\n", msg_t._widget_id);
+    printf(" msg_t._widget_type = %x\n", msg_t._widget_type);
+    printf("msg_t._msg[%d] = ", len - 12);
+    for (int i = 0; i < (len - 12); i++)
+    {
+        printf("%x ", msg_t._msg[i]);
+    }
+    printf("\n");
+    printf(" msg_t._tail = %lx\n", msg_t._tail);
+#endif
 
     switch (GET_HEIGH_8BITS(msg_t._cmd_type))
     {

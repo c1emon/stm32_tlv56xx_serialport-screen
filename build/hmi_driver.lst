@@ -1,0 +1,1110 @@
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.eabi_attribute 27, 1
+   3              		.eabi_attribute 28, 1
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"hmi_driver.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.section	.text.send_word_uint8,"ax",%progbits
+  18              		.align	1
+  19              		.syntax unified
+  20              		.thumb
+  21              		.thumb_func
+  22              		.fpu fpv4-sp-d16
+  24              	send_word_uint8:
+  25              	.LFB123:
+  26              		.file 1 "Core/Src/hmi_driver.c"
+   1:Core/Src/hmi_driver.c **** #include "hmi_driver.h"
+   2:Core/Src/hmi_driver.c **** #include "usart.h"
+   3:Core/Src/hmi_driver.c **** #include "utility.h"
+   4:Core/Src/hmi_driver.c **** #include <stdlib.h>
+   5:Core/Src/hmi_driver.c **** // #include "crc16.h"
+   6:Core/Src/hmi_driver.c **** 
+   7:Core/Src/hmi_driver.c **** //group1
+   8:Core/Src/hmi_driver.c **** float phase = 0;
+   9:Core/Src/hmi_driver.c **** float voltage = 0;
+  10:Core/Src/hmi_driver.c **** quint8 ctrl = 0;
+  11:Core/Src/hmi_driver.c **** //frame args
+  12:Core/Src/hmi_driver.c **** #define FRAME_HEAD 0XEE
+  13:Core/Src/hmi_driver.c **** #define FRAME_TAIL 0XFFFCFFFF
+  14:Core/Src/hmi_driver.c **** 
+  15:Core/Src/hmi_driver.c **** //com args
+  16:Core/Src/hmi_driver.c **** #define NOTIFY_TOUCH_PRESS 0X01       //触摸屏按下通知
+  17:Core/Src/hmi_driver.c **** #define NOTIFY_TOUCH_RELEASE 0X03     //触摸屏松开通知
+  18:Core/Src/hmi_driver.c **** #define NOTIFY_WRITE_FLASH_OK 0X0C    //写FLASH成功
+  19:Core/Src/hmi_driver.c **** #define NOTIFY_WRITE_FLASH_FAILD 0X0D //写FLASH失败
+  20:Core/Src/hmi_driver.c **** #define NOTIFY_READ_FLASH_OK 0X0B     //读FLASH成功
+  21:Core/Src/hmi_driver.c **** #define NOTIFY_READ_FLASH_FAILD 0X0F  //读FLASH失败
+  22:Core/Src/hmi_driver.c **** #define NOTIFY_MENU 0X14              //菜单事件通知
+  23:Core/Src/hmi_driver.c **** #define NOTIFY_TIMER 0X43             //定时器超时通知
+  24:Core/Src/hmi_driver.c **** #define NOTIFY_CONTROL 0XB1           //控件更新通知
+  25:Core/Src/hmi_driver.c **** #define NOTIFY_READ_RTC 0XF7          //读取RTC时间
+  26:Core/Src/hmi_driver.c **** #define MSG_GET_CURRENT_SCREEN 0X01   //画面ID变化通知
+  27:Core/Src/hmi_driver.c **** #define MSG_GET_DATA 0X11             //控件数据通知
+  28:Core/Src/hmi_driver.c **** #define NOTIFY_HandShake 0X55         //握手通知
+  29:Core/Src/hmi_driver.c **** 
+  30:Core/Src/hmi_driver.c **** //wedget type
+  31:Core/Src/hmi_driver.c **** enum CtrlType
+  32:Core/Src/hmi_driver.c **** {
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 2
+
+
+  33:Core/Src/hmi_driver.c ****     kCtrlUnknown = 0x00,
+  34:Core/Src/hmi_driver.c ****     kCtrlButton = 0x10, //按钮
+  35:Core/Src/hmi_driver.c ****     kCtrlText,          //文本
+  36:Core/Src/hmi_driver.c ****     kCtrlProgress,      //进度条
+  37:Core/Src/hmi_driver.c ****     kCtrlSlider,        //滑动条
+  38:Core/Src/hmi_driver.c ****     kCtrlMeter,         //仪表
+  39:Core/Src/hmi_driver.c ****     kCtrlDropList,      //下拉列表
+  40:Core/Src/hmi_driver.c ****     kCtrlAnimation,     //动画
+  41:Core/Src/hmi_driver.c ****     kCtrlRTC,           //时间显示
+  42:Core/Src/hmi_driver.c ****     kCtrlGraph,         //曲线图控件
+  43:Core/Src/hmi_driver.c ****     kCtrlTable,         //表格控件
+  44:Core/Src/hmi_driver.c ****     kCtrlMenu,          //菜单控件
+  45:Core/Src/hmi_driver.c ****     kCtrlSelector,      //选择控件
+  46:Core/Src/hmi_driver.c ****     kCtrlQRCode,        //二维码
+  47:Core/Src/hmi_driver.c **** };
+  48:Core/Src/hmi_driver.c **** 
+  49:Core/Src/hmi_driver.c **** //message prase
+  50:Core/Src/hmi_driver.c **** typedef struct _msg_type
+  51:Core/Src/hmi_driver.c **** {
+  52:Core/Src/hmi_driver.c ****     quint8 _head;
+  53:Core/Src/hmi_driver.c ****     quint16 _cmd_type;
+  54:Core/Src/hmi_driver.c ****     quint16 _screen_id;
+  55:Core/Src/hmi_driver.c ****     quint16 _widget_id;
+  56:Core/Src/hmi_driver.c ****     quint8 _widget_type;
+  57:Core/Src/hmi_driver.c ****     quint8 _msg[MAX_MSG_LENGTH];
+  58:Core/Src/hmi_driver.c ****     quint32 _tail;
+  59:Core/Src/hmi_driver.c **** } Hmi_msg;
+  60:Core/Src/hmi_driver.c **** /********************************************************************************/
+  61:Core/Src/hmi_driver.c **** extern UART_HandleTypeDef huart3;
+  62:Core/Src/hmi_driver.c **** #define pserialPort (&huart3)
+  63:Core/Src/hmi_driver.c **** static HAL_StatusTypeDef send_word_uint8(const quint8 ch)
+  64:Core/Src/hmi_driver.c **** {
+  27              		.loc 1 64 0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 8
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31              	.LVL0:
+  32 0000 00B5     		push	{lr}
+  33              	.LCFI0:
+  34              		.cfi_def_cfa_offset 4
+  35              		.cfi_offset 14, -4
+  36 0002 83B0     		sub	sp, sp, #12
+  37              	.LCFI1:
+  38              		.cfi_def_cfa_offset 16
+  65:Core/Src/hmi_driver.c ****     quint8 ch_t = ch & 0xff;
+  39              		.loc 1 65 0
+  40 0004 02A9     		add	r1, sp, #8
+  41 0006 01F8010D 		strb	r0, [r1, #-1]!
+  66:Core/Src/hmi_driver.c ****     return HAL_UART_Transmit(pserialPort, (uint8_t *)(&ch_t), 1, 1);
+  42              		.loc 1 66 0
+  43 000a 0123     		movs	r3, #1
+  44 000c 1A46     		mov	r2, r3
+  45 000e 0348     		ldr	r0, .L3
+  46              	.LVL1:
+  47 0010 FFF7FEFF 		bl	HAL_UART_Transmit
+  48              	.LVL2:
+  67:Core/Src/hmi_driver.c **** }
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 3
+
+
+  49              		.loc 1 67 0
+  50 0014 03B0     		add	sp, sp, #12
+  51              	.LCFI2:
+  52              		.cfi_def_cfa_offset 4
+  53              		@ sp needed
+  54 0016 5DF804FB 		ldr	pc, [sp], #4
+  55              	.L4:
+  56 001a 00BF     		.align	2
+  57              	.L3:
+  58 001c 00000000 		.word	huart3
+  59              		.cfi_endproc
+  60              	.LFE123:
+  62              		.section	.text.hmi_button_press,"ax",%progbits
+  63              		.align	1
+  64              		.syntax unified
+  65              		.thumb
+  66              		.thumb_func
+  67              		.fpu fpv4-sp-d16
+  69              	hmi_button_press:
+  70              	.LFB127:
+  68:Core/Src/hmi_driver.c **** 
+  69:Core/Src/hmi_driver.c **** void send_string_uint8(quint8 *str, quint16 len)
+  70:Core/Src/hmi_driver.c **** {
+  71:Core/Src/hmi_driver.c ****     for (int i = 0; i < len; ++i)
+  72:Core/Src/hmi_driver.c ****     {
+  73:Core/Src/hmi_driver.c ****         send_word_uint8(str[i]);
+  74:Core/Src/hmi_driver.c ****     }
+  75:Core/Src/hmi_driver.c **** }
+  76:Core/Src/hmi_driver.c **** 
+  77:Core/Src/hmi_driver.c **** void send_string_uint16(quint16 *str, quint16 len)
+  78:Core/Src/hmi_driver.c **** {
+  79:Core/Src/hmi_driver.c ****     for (int i = 0; i < len; ++i)
+  80:Core/Src/hmi_driver.c ****     {
+  81:Core/Src/hmi_driver.c ****         send_word_uint8(GET_HEIGH_8BITS(str[i]));
+  82:Core/Src/hmi_driver.c ****         send_word_uint8(GET_LOW_8BITS(str[i]));
+  83:Core/Src/hmi_driver.c ****     }
+  84:Core/Src/hmi_driver.c **** }
+  85:Core/Src/hmi_driver.c **** /********************************************************************************/
+  86:Core/Src/hmi_driver.c **** 
+  87:Core/Src/hmi_driver.c **** //获取帧
+  88:Core/Src/hmi_driver.c **** quint16 queue_find_frame(Queue *queue, quint8 *frame)
+  89:Core/Src/hmi_driver.c **** {
+  90:Core/Src/hmi_driver.c ****     static quint16 pFrame = 0;
+  91:Core/Src/hmi_driver.c ****     static quint32 _tail = 0;
+  92:Core/Src/hmi_driver.c ****     quint8 _data = 0;
+  93:Core/Src/hmi_driver.c **** 
+  94:Core/Src/hmi_driver.c ****     while (queue_getSize(*queue) > 0)
+  95:Core/Src/hmi_driver.c ****     {
+  96:Core/Src/hmi_driver.c ****         _data = queue_pop(queue);
+  97:Core/Src/hmi_driver.c ****         if ((pFrame == 0) && (_data != FRAME_HEAD)) //丢失帧头全部丢弃
+  98:Core/Src/hmi_driver.c ****         {
+  99:Core/Src/hmi_driver.c ****             continue;
+ 100:Core/Src/hmi_driver.c ****         }
+ 101:Core/Src/hmi_driver.c **** 
+ 102:Core/Src/hmi_driver.c ****         frame[pFrame++] = _data; //保存
+ 103:Core/Src/hmi_driver.c **** 
+ 104:Core/Src/hmi_driver.c ****         _tail = ((_tail << 8) | _data) & 0xFFFFFFFF; //获取最后四位,组合成32bit数据
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 4
+
+
+ 105:Core/Src/hmi_driver.c **** 
+ 106:Core/Src/hmi_driver.c ****         if (_tail == FRAME_TAIL) //获取到帧尾
+ 107:Core/Src/hmi_driver.c ****         {
+ 108:Core/Src/hmi_driver.c ****             _tail = 0;
+ 109:Core/Src/hmi_driver.c ****             quint16 frame_size = pFrame;
+ 110:Core/Src/hmi_driver.c ****             pFrame = 0;
+ 111:Core/Src/hmi_driver.c ****             //crc16
+ 112:Core/Src/hmi_driver.c ****             return frame_size;
+ 113:Core/Src/hmi_driver.c ****         }
+ 114:Core/Src/hmi_driver.c ****     }
+ 115:Core/Src/hmi_driver.c **** 
+ 116:Core/Src/hmi_driver.c ****     return 0;
+ 117:Core/Src/hmi_driver.c **** }
+ 118:Core/Src/hmi_driver.c **** 
+ 119:Core/Src/hmi_driver.c **** static void hmi_button_press(const Hmi_msg msg_t)
+ 120:Core/Src/hmi_driver.c **** {
+  71              		.loc 1 120 0
+  72              		.cfi_startproc
+  73              		@ args = 1040, pretend = 16, frame = 0
+  74              		@ frame_needed = 0, uses_anonymous_args = 0
+  75 0000 84B0     		sub	sp, sp, #16
+  76              	.LCFI3:
+  77              		.cfi_def_cfa_offset 16
+  78 0002 08B5     		push	{r3, lr}
+  79              	.LCFI4:
+  80              		.cfi_def_cfa_offset 24
+  81              		.cfi_offset 3, -24
+  82              		.cfi_offset 14, -20
+  83 0004 0DF1080C 		add	ip, sp, #8
+  84 0008 8CE80F00 		stm	ip, {r0, r1, r2, r3}
+ 121:Core/Src/hmi_driver.c ****     switch (msg_t._screen_id)
+  85              		.loc 1 121 0
+  86 000c BDF80C30 		ldrh	r3, [sp, #12]
+  87 0010 1BB9     		cbnz	r3, .L5
+ 122:Core/Src/hmi_driver.c ****     {
+ 123:Core/Src/hmi_driver.c ****     case 0:
+ 124:Core/Src/hmi_driver.c ****         if (msg_t._widget_id == 3)
+  88              		.loc 1 124 0
+  89 0012 BDF80E30 		ldrh	r3, [sp, #14]
+  90 0016 032B     		cmp	r3, #3
+  91 0018 03D0     		beq	.L10
+  92              	.L5:
+ 125:Core/Src/hmi_driver.c ****         {
+ 126:Core/Src/hmi_driver.c ****             if (msg_t._msg[1])
+ 127:Core/Src/hmi_driver.c ****             { //按钮按下
+ 128:Core/Src/hmi_driver.c ****                 ctrl = 1;
+ 129:Core/Src/hmi_driver.c ****                 printf("output enable.\n");
+ 130:Core/Src/hmi_driver.c ****             }
+ 131:Core/Src/hmi_driver.c ****             else
+ 132:Core/Src/hmi_driver.c ****             { //按钮弹起
+ 133:Core/Src/hmi_driver.c ****                 ctrl = 0;
+ 134:Core/Src/hmi_driver.c ****                 printf("output disable.\n");
+ 135:Core/Src/hmi_driver.c ****             }
+ 136:Core/Src/hmi_driver.c ****         }
+ 137:Core/Src/hmi_driver.c ****         break;
+ 138:Core/Src/hmi_driver.c **** 
+ 139:Core/Src/hmi_driver.c ****     default:
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 5
+
+
+ 140:Core/Src/hmi_driver.c ****         break;
+ 141:Core/Src/hmi_driver.c ****     }
+ 142:Core/Src/hmi_driver.c **** }
+  93              		.loc 1 142 0
+  94 001a BDE80840 		pop	{r3, lr}
+  95              	.LCFI5:
+  96              		.cfi_remember_state
+  97              		.cfi_restore 14
+  98              		.cfi_restore 3
+  99              		.cfi_def_cfa_offset 16
+ 100 001e 04B0     		add	sp, sp, #16
+ 101              	.LCFI6:
+ 102              		.cfi_def_cfa_offset 0
+ 103 0020 7047     		bx	lr
+ 104              	.L10:
+ 105              	.LCFI7:
+ 106              		.cfi_restore_state
+ 126:Core/Src/hmi_driver.c ****             { //按钮按下
+ 107              		.loc 1 126 0
+ 108 0022 9DF81230 		ldrb	r3, [sp, #18]	@ zero_extendqisi2
+ 109 0026 33B9     		cbnz	r3, .L11
+ 110              	.LBB2:
+ 133:Core/Src/hmi_driver.c ****                 printf("output disable.\n");
+ 111              		.loc 1 133 0
+ 112 0028 064B     		ldr	r3, .L12
+ 113 002a 0022     		movs	r2, #0
+ 114 002c 1A70     		strb	r2, [r3]
+ 134:Core/Src/hmi_driver.c ****             }
+ 115              		.loc 1 134 0
+ 116 002e 0648     		ldr	r0, .L12+4
+ 117 0030 FFF7FEFF 		bl	puts
+ 118              	.LVL3:
+ 119              	.LBE2:
+ 120              		.loc 1 142 0
+ 121 0034 F1E7     		b	.L5
+ 122              	.L11:
+ 123              	.LBB3:
+ 128:Core/Src/hmi_driver.c ****                 printf("output enable.\n");
+ 124              		.loc 1 128 0
+ 125 0036 034B     		ldr	r3, .L12
+ 126 0038 0122     		movs	r2, #1
+ 127 003a 1A70     		strb	r2, [r3]
+ 129:Core/Src/hmi_driver.c ****             }
+ 128              		.loc 1 129 0
+ 129 003c 0348     		ldr	r0, .L12+8
+ 130 003e FFF7FEFF 		bl	puts
+ 131              	.LVL4:
+ 132              	.LBE3:
+ 133 0042 EAE7     		b	.L5
+ 134              	.L13:
+ 135              		.align	2
+ 136              	.L12:
+ 137 0044 00000000 		.word	.LANCHOR0
+ 138 0048 10000000 		.word	.LC1
+ 139 004c 00000000 		.word	.LC0
+ 140              		.cfi_endproc
+ 141              	.LFE127:
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 6
+
+
+ 143              		.global	__aeabi_d2f
+ 144              		.section	.text.hmi_text_set,"ax",%progbits
+ 145              		.align	1
+ 146              		.syntax unified
+ 147              		.thumb
+ 148              		.thumb_func
+ 149              		.fpu fpv4-sp-d16
+ 151              	hmi_text_set:
+ 152              	.LFB128:
+ 143:Core/Src/hmi_driver.c **** 
+ 144:Core/Src/hmi_driver.c **** static void hmi_text_set(const Hmi_msg msg_t)
+ 145:Core/Src/hmi_driver.c **** {
+ 153              		.loc 1 145 0
+ 154              		.cfi_startproc
+ 155              		@ args = 1040, pretend = 16, frame = 0
+ 156              		@ frame_needed = 0, uses_anonymous_args = 0
+ 157 0000 84B0     		sub	sp, sp, #16
+ 158              	.LCFI8:
+ 159              		.cfi_def_cfa_offset 16
+ 160 0002 08B5     		push	{r3, lr}
+ 161              	.LCFI9:
+ 162              		.cfi_def_cfa_offset 24
+ 163              		.cfi_offset 3, -24
+ 164              		.cfi_offset 14, -20
+ 165 0004 0DF1080C 		add	ip, sp, #8
+ 166 0008 8CE80F00 		stm	ip, {r0, r1, r2, r3}
+ 146:Core/Src/hmi_driver.c ****     switch (msg_t._screen_id)
+ 167              		.loc 1 146 0
+ 168 000c BDF80C30 		ldrh	r3, [sp, #12]
+ 169 0010 2BB9     		cbnz	r3, .L14
+ 147:Core/Src/hmi_driver.c ****     {
+ 148:Core/Src/hmi_driver.c ****     case 0:
+ 149:Core/Src/hmi_driver.c ****         if (msg_t._widget_id == 1)
+ 170              		.loc 1 149 0
+ 171 0012 BDF80E30 		ldrh	r3, [sp, #14]
+ 172 0016 012B     		cmp	r3, #1
+ 173 0018 05D0     		beq	.L19
+ 150:Core/Src/hmi_driver.c ****         {
+ 151:Core/Src/hmi_driver.c ****             voltage = atof(msg_t._msg);
+ 152:Core/Src/hmi_driver.c **** #if DEBUG
+ 153:Core/Src/hmi_driver.c ****             printf("voltage = %.2lf V\n", voltage);
+ 154:Core/Src/hmi_driver.c **** #endif
+ 155:Core/Src/hmi_driver.c ****         }
+ 156:Core/Src/hmi_driver.c ****         else if (msg_t._widget_id == 2)
+ 174              		.loc 1 156 0
+ 175 001a 022B     		cmp	r3, #2
+ 176 001c 0ED0     		beq	.L20
+ 177              	.L14:
+ 157:Core/Src/hmi_driver.c ****         {
+ 158:Core/Src/hmi_driver.c ****             phase = atof(msg_t._msg);
+ 159:Core/Src/hmi_driver.c **** #if DEBUG
+ 160:Core/Src/hmi_driver.c ****             printf("phase = %.2f deg\n", phase);
+ 161:Core/Src/hmi_driver.c **** #endif
+ 162:Core/Src/hmi_driver.c ****         }
+ 163:Core/Src/hmi_driver.c **** 
+ 164:Core/Src/hmi_driver.c ****         break;
+ 165:Core/Src/hmi_driver.c **** 
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 7
+
+
+ 166:Core/Src/hmi_driver.c ****     default:
+ 167:Core/Src/hmi_driver.c ****         break;
+ 168:Core/Src/hmi_driver.c ****     }
+ 169:Core/Src/hmi_driver.c **** }
+ 178              		.loc 1 169 0
+ 179 001e BDE80840 		pop	{r3, lr}
+ 180              	.LCFI10:
+ 181              		.cfi_remember_state
+ 182              		.cfi_restore 14
+ 183              		.cfi_restore 3
+ 184              		.cfi_def_cfa_offset 16
+ 185 0022 04B0     		add	sp, sp, #16
+ 186              	.LCFI11:
+ 187              		.cfi_def_cfa_offset 0
+ 188 0024 7047     		bx	lr
+ 189              	.L19:
+ 190              	.LCFI12:
+ 191              		.cfi_restore_state
+ 151:Core/Src/hmi_driver.c **** #if DEBUG
+ 192              		.loc 1 151 0
+ 193 0026 0DF11100 		add	r0, sp, #17
+ 194 002a FFF7FEFF 		bl	atof
+ 195              	.LVL5:
+ 196 002e 51EC100B 		vmov	r0, r1, d0
+ 197 0032 FFF7FEFF 		bl	__aeabi_d2f
+ 198              	.LVL6:
+ 199 0036 074B     		ldr	r3, .L21
+ 200 0038 1860     		str	r0, [r3]	@ float
+ 201 003a F0E7     		b	.L14
+ 202              	.L20:
+ 158:Core/Src/hmi_driver.c **** #if DEBUG
+ 203              		.loc 1 158 0
+ 204 003c 0DF11100 		add	r0, sp, #17
+ 205 0040 FFF7FEFF 		bl	atof
+ 206              	.LVL7:
+ 207 0044 51EC100B 		vmov	r0, r1, d0
+ 208 0048 FFF7FEFF 		bl	__aeabi_d2f
+ 209              	.LVL8:
+ 210 004c 024B     		ldr	r3, .L21+4
+ 211 004e 1860     		str	r0, [r3]	@ float
+ 212              		.loc 1 169 0
+ 213 0050 E5E7     		b	.L14
+ 214              	.L22:
+ 215 0052 00BF     		.align	2
+ 216              	.L21:
+ 217 0054 00000000 		.word	.LANCHOR1
+ 218 0058 00000000 		.word	.LANCHOR2
+ 219              		.cfi_endproc
+ 220              	.LFE128:
+ 222              		.section	.text.process_notify,"ax",%progbits
+ 223              		.align	1
+ 224              		.syntax unified
+ 225              		.thumb
+ 226              		.thumb_func
+ 227              		.fpu fpv4-sp-d16
+ 229              	process_notify:
+ 230              	.LFB129:
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 8
+
+
+ 170:Core/Src/hmi_driver.c **** 
+ 171:Core/Src/hmi_driver.c **** static void process_notify(const Hmi_msg msg_t)
+ 172:Core/Src/hmi_driver.c **** {
+ 231              		.loc 1 172 0
+ 232              		.cfi_startproc
+ 233              		@ args = 1040, pretend = 16, frame = 0
+ 234              		@ frame_needed = 0, uses_anonymous_args = 0
+ 235 0000 84B0     		sub	sp, sp, #16
+ 236              	.LCFI13:
+ 237              		.cfi_def_cfa_offset 16
+ 238 0002 00B5     		push	{lr}
+ 239              	.LCFI14:
+ 240              		.cfi_def_cfa_offset 20
+ 241              		.cfi_offset 14, -20
+ 242 0004 ADF2044D 		subw	sp, sp, #1028
+ 243              	.LCFI15:
+ 244              		.cfi_def_cfa_offset 1048
+ 245 0008 0DF5816C 		add	ip, sp, #1032
+ 246 000c 8CE80F00 		stm	ip, {r0, r1, r2, r3}
+ 173:Core/Src/hmi_driver.c ****     if (GET_LOW_8BITS(msg_t._cmd_type) == MSG_GET_CURRENT_SCREEN) //屏幕切换通知
+ 247              		.loc 1 173 0
+ 248 0010 9DF80A34 		ldrb	r3, [sp, #1034]	@ zero_extendqisi2
+ 249 0014 012B     		cmp	r3, #1
+ 250 0016 0BD0     		beq	.L29
+ 174:Core/Src/hmi_driver.c ****     {
+ 175:Core/Src/hmi_driver.c ****         printf("change screen\n");
+ 176:Core/Src/hmi_driver.c ****     }
+ 177:Core/Src/hmi_driver.c ****     else
+ 178:Core/Src/hmi_driver.c ****     {
+ 179:Core/Src/hmi_driver.c ****         // switch (GET_LOW_8BITS(msg_t._cmd_type))
+ 180:Core/Src/hmi_driver.c ****         switch (msg_t._widget_type)
+ 251              		.loc 1 180 0
+ 252 0018 9DF81034 		ldrb	r3, [sp, #1040]	@ zero_extendqisi2
+ 253 001c 102B     		cmp	r3, #16
+ 254 001e 0BD0     		beq	.L26
+ 255 0020 112B     		cmp	r3, #17
+ 256 0022 16D0     		beq	.L27
+ 257              	.L23:
+ 181:Core/Src/hmi_driver.c ****         {
+ 182:Core/Src/hmi_driver.c ****         case kCtrlButton: //按钮控件
+ 183:Core/Src/hmi_driver.c ****             hmi_button_press(msg_t);
+ 184:Core/Src/hmi_driver.c ****             break;
+ 185:Core/Src/hmi_driver.c ****         case kCtrlText: //文本控件
+ 186:Core/Src/hmi_driver.c ****             hmi_text_set(msg_t);
+ 187:Core/Src/hmi_driver.c ****             break;
+ 188:Core/Src/hmi_driver.c ****         case kCtrlProgress: //进度条控件
+ 189:Core/Src/hmi_driver.c **** 
+ 190:Core/Src/hmi_driver.c ****             break;
+ 191:Core/Src/hmi_driver.c ****         case kCtrlSlider: //滑动条控件
+ 192:Core/Src/hmi_driver.c **** 
+ 193:Core/Src/hmi_driver.c ****             break;
+ 194:Core/Src/hmi_driver.c ****         case kCtrlMeter: //仪表控件
+ 195:Core/Src/hmi_driver.c **** 
+ 196:Core/Src/hmi_driver.c ****             break;
+ 197:Core/Src/hmi_driver.c ****         case kCtrlMenu: //菜单控件
+ 198:Core/Src/hmi_driver.c **** 
+ 199:Core/Src/hmi_driver.c ****             break;
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 9
+
+
+ 200:Core/Src/hmi_driver.c ****         case kCtrlSelector: //选择控件
+ 201:Core/Src/hmi_driver.c **** 
+ 202:Core/Src/hmi_driver.c ****             break;
+ 203:Core/Src/hmi_driver.c ****         case kCtrlRTC: //倒计时控件
+ 204:Core/Src/hmi_driver.c **** 
+ 205:Core/Src/hmi_driver.c ****             break;
+ 206:Core/Src/hmi_driver.c ****         default:
+ 207:Core/Src/hmi_driver.c ****             break;
+ 208:Core/Src/hmi_driver.c ****         }
+ 209:Core/Src/hmi_driver.c ****     }
+ 210:Core/Src/hmi_driver.c **** }
+ 258              		.loc 1 210 0
+ 259 0024 0DF2044D 		addw	sp, sp, #1028
+ 260              	.LCFI16:
+ 261              		.cfi_remember_state
+ 262              		.cfi_def_cfa_offset 20
+ 263              		@ sp needed
+ 264 0028 5DF804EB 		ldr	lr, [sp], #4
+ 265              	.LCFI17:
+ 266              		.cfi_restore 14
+ 267              		.cfi_def_cfa_offset 16
+ 268 002c 04B0     		add	sp, sp, #16
+ 269              	.LCFI18:
+ 270              		.cfi_def_cfa_offset 0
+ 271 002e 7047     		bx	lr
+ 272              	.L29:
+ 273              	.LCFI19:
+ 274              		.cfi_restore_state
+ 275              	.LBB4:
+ 175:Core/Src/hmi_driver.c ****     }
+ 276              		.loc 1 175 0
+ 277 0030 0E48     		ldr	r0, .L30
+ 278 0032 FFF7FEFF 		bl	puts
+ 279              	.LVL9:
+ 280              	.LBE4:
+ 281 0036 F5E7     		b	.L23
+ 282              	.L26:
+ 183:Core/Src/hmi_driver.c ****             break;
+ 283              		.loc 1 183 0
+ 284 0038 4FF48062 		mov	r2, #1024
+ 285 003c 0DF58361 		add	r1, sp, #1048
+ 286 0040 6846     		mov	r0, sp
+ 287 0042 FFF7FEFF 		bl	memcpy
+ 288              	.LVL10:
+ 289 0046 0DF58163 		add	r3, sp, #1032
+ 290 004a 0FCB     		ldm	r3, {r0, r1, r2, r3}
+ 291 004c FFF7FEFF 		bl	hmi_button_press
+ 292              	.LVL11:
+ 184:Core/Src/hmi_driver.c ****         case kCtrlText: //文本控件
+ 293              		.loc 1 184 0
+ 294 0050 E8E7     		b	.L23
+ 295              	.L27:
+ 186:Core/Src/hmi_driver.c ****             break;
+ 296              		.loc 1 186 0
+ 297 0052 4FF48062 		mov	r2, #1024
+ 298 0056 0DF58361 		add	r1, sp, #1048
+ 299 005a 6846     		mov	r0, sp
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 10
+
+
+ 300 005c FFF7FEFF 		bl	memcpy
+ 301              	.LVL12:
+ 302 0060 0DF58163 		add	r3, sp, #1032
+ 303 0064 0FCB     		ldm	r3, {r0, r1, r2, r3}
+ 304 0066 FFF7FEFF 		bl	hmi_text_set
+ 305              	.LVL13:
+ 306              		.loc 1 210 0
+ 307 006a DBE7     		b	.L23
+ 308              	.L31:
+ 309              		.align	2
+ 310              	.L30:
+ 311 006c 00000000 		.word	.LC2
+ 312              		.cfi_endproc
+ 313              	.LFE129:
+ 315              		.section	.text.send_string_uint8,"ax",%progbits
+ 316              		.align	1
+ 317              		.global	send_string_uint8
+ 318              		.syntax unified
+ 319              		.thumb
+ 320              		.thumb_func
+ 321              		.fpu fpv4-sp-d16
+ 323              	send_string_uint8:
+ 324              	.LFB124:
+  70:Core/Src/hmi_driver.c ****     for (int i = 0; i < len; ++i)
+ 325              		.loc 1 70 0
+ 326              		.cfi_startproc
+ 327              		@ args = 0, pretend = 0, frame = 0
+ 328              		@ frame_needed = 0, uses_anonymous_args = 0
+ 329              	.LVL14:
+ 330 0000 70B5     		push	{r4, r5, r6, lr}
+ 331              	.LCFI20:
+ 332              		.cfi_def_cfa_offset 16
+ 333              		.cfi_offset 4, -16
+ 334              		.cfi_offset 5, -12
+ 335              		.cfi_offset 6, -8
+ 336              		.cfi_offset 14, -4
+ 337 0002 0646     		mov	r6, r0
+ 338 0004 0D46     		mov	r5, r1
+ 339              	.LVL15:
+ 340              	.LBB5:
+  71:Core/Src/hmi_driver.c ****     {
+ 341              		.loc 1 71 0
+ 342 0006 0024     		movs	r4, #0
+ 343 0008 03E0     		b	.L33
+ 344              	.LVL16:
+ 345              	.L34:
+  73:Core/Src/hmi_driver.c ****     }
+ 346              		.loc 1 73 0 discriminator 3
+ 347 000a 305D     		ldrb	r0, [r6, r4]	@ zero_extendqisi2
+ 348 000c FFF7FEFF 		bl	send_word_uint8
+ 349              	.LVL17:
+  71:Core/Src/hmi_driver.c ****     {
+ 350              		.loc 1 71 0 discriminator 3
+ 351 0010 0134     		adds	r4, r4, #1
+ 352              	.LVL18:
+ 353              	.L33:
+  71:Core/Src/hmi_driver.c ****     {
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 11
+
+
+ 354              		.loc 1 71 0 is_stmt 0 discriminator 1
+ 355 0012 A542     		cmp	r5, r4
+ 356 0014 F9DC     		bgt	.L34
+ 357              	.LBE5:
+  75:Core/Src/hmi_driver.c **** 
+ 358              		.loc 1 75 0 is_stmt 1
+ 359 0016 70BD     		pop	{r4, r5, r6, pc}
+ 360              		.cfi_endproc
+ 361              	.LFE124:
+ 363              		.section	.text.send_string_uint16,"ax",%progbits
+ 364              		.align	1
+ 365              		.global	send_string_uint16
+ 366              		.syntax unified
+ 367              		.thumb
+ 368              		.thumb_func
+ 369              		.fpu fpv4-sp-d16
+ 371              	send_string_uint16:
+ 372              	.LFB125:
+  78:Core/Src/hmi_driver.c ****     for (int i = 0; i < len; ++i)
+ 373              		.loc 1 78 0
+ 374              		.cfi_startproc
+ 375              		@ args = 0, pretend = 0, frame = 0
+ 376              		@ frame_needed = 0, uses_anonymous_args = 0
+ 377              	.LVL19:
+ 378 0000 70B5     		push	{r4, r5, r6, lr}
+ 379              	.LCFI21:
+ 380              		.cfi_def_cfa_offset 16
+ 381              		.cfi_offset 4, -16
+ 382              		.cfi_offset 5, -12
+ 383              		.cfi_offset 6, -8
+ 384              		.cfi_offset 14, -4
+ 385 0002 0546     		mov	r5, r0
+ 386 0004 0E46     		mov	r6, r1
+ 387              	.LVL20:
+ 388              	.LBB6:
+  79:Core/Src/hmi_driver.c ****     {
+ 389              		.loc 1 79 0
+ 390 0006 0024     		movs	r4, #0
+ 391 0008 09E0     		b	.L37
+ 392              	.LVL21:
+ 393              	.L38:
+  81:Core/Src/hmi_driver.c ****         send_word_uint8(GET_LOW_8BITS(str[i]));
+ 394              		.loc 1 81 0 discriminator 3
+ 395 000a 35F81400 		ldrh	r0, [r5, r4, lsl #1]
+ 396 000e 000A     		lsrs	r0, r0, #8
+ 397 0010 FFF7FEFF 		bl	send_word_uint8
+ 398              	.LVL22:
+  82:Core/Src/hmi_driver.c ****     }
+ 399              		.loc 1 82 0 discriminator 3
+ 400 0014 15F81400 		ldrb	r0, [r5, r4, lsl #1]	@ zero_extendqisi2
+ 401 0018 FFF7FEFF 		bl	send_word_uint8
+ 402              	.LVL23:
+  79:Core/Src/hmi_driver.c ****     {
+ 403              		.loc 1 79 0 discriminator 3
+ 404 001c 0134     		adds	r4, r4, #1
+ 405              	.LVL24:
+ 406              	.L37:
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 12
+
+
+  79:Core/Src/hmi_driver.c ****     {
+ 407              		.loc 1 79 0 is_stmt 0 discriminator 1
+ 408 001e A642     		cmp	r6, r4
+ 409 0020 F3DC     		bgt	.L38
+ 410              	.LBE6:
+  84:Core/Src/hmi_driver.c **** /********************************************************************************/
+ 411              		.loc 1 84 0 is_stmt 1
+ 412 0022 70BD     		pop	{r4, r5, r6, pc}
+ 413              		.cfi_endproc
+ 414              	.LFE125:
+ 416              		.section	.text.queue_find_frame,"ax",%progbits
+ 417              		.align	1
+ 418              		.global	queue_find_frame
+ 419              		.syntax unified
+ 420              		.thumb
+ 421              		.thumb_func
+ 422              		.fpu fpv4-sp-d16
+ 424              	queue_find_frame:
+ 425              	.LFB126:
+  89:Core/Src/hmi_driver.c ****     static quint16 pFrame = 0;
+ 426              		.loc 1 89 0
+ 427              		.cfi_startproc
+ 428              		@ args = 0, pretend = 0, frame = 0
+ 429              		@ frame_needed = 0, uses_anonymous_args = 0
+ 430              	.LVL25:
+ 431 0000 2DE9F043 		push	{r4, r5, r6, r7, r8, r9, lr}
+ 432              	.LCFI22:
+ 433              		.cfi_def_cfa_offset 28
+ 434              		.cfi_offset 4, -28
+ 435              		.cfi_offset 5, -24
+ 436              		.cfi_offset 6, -20
+ 437              		.cfi_offset 7, -16
+ 438              		.cfi_offset 8, -12
+ 439              		.cfi_offset 9, -8
+ 440              		.cfi_offset 14, -4
+ 441 0004 ADF57F7D 		sub	sp, sp, #1020
+ 442              	.LCFI23:
+ 443              		.cfi_def_cfa_offset 1048
+ 444 0008 0446     		mov	r4, r0
+ 445 000a 0D46     		mov	r5, r1
+ 446              	.LVL26:
+  94:Core/Src/hmi_driver.c ****     {
+ 447              		.loc 1 94 0
+ 448 000c 0DE0     		b	.L41
+ 449              	.LVL27:
+ 450              	.L42:
+ 102:Core/Src/hmi_driver.c **** 
+ 451              		.loc 1 102 0
+ 452 000e 531C     		adds	r3, r2, #1
+ 453 0010 9BB2     		uxth	r3, r3
+ 454 0012 1A49     		ldr	r1, .L48
+ 455 0014 0B80     		strh	r3, [r1]	@ movhi
+ 456 0016 A854     		strb	r0, [r5, r2]
+ 104:Core/Src/hmi_driver.c **** 
+ 457              		.loc 1 104 0
+ 458 0018 194A     		ldr	r2, .L48+4
+ 459 001a 1168     		ldr	r1, [r2]
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 13
+
+
+ 460 001c 40EA0120 		orr	r0, r0, r1, lsl #8
+ 461              	.LVL28:
+ 462 0020 1060     		str	r0, [r2]
+ 106:Core/Src/hmi_driver.c ****         {
+ 463              		.loc 1 106 0
+ 464 0022 6FF44032 		mvn	r2, #196608
+ 465 0026 9042     		cmp	r0, r2
+ 466 0028 1ED0     		beq	.L47
+ 467              	.L41:
+  94:Core/Src/hmi_driver.c ****     {
+ 468              		.loc 1 94 0
+ 469 002a D4F80090 		ldr	r9, [r4]	@ unaligned
+ 470 002e D4F80480 		ldr	r8, [r4, #4]	@ unaligned
+ 471 0032 A768     		ldr	r7, [r4, #8]	@ unaligned
+ 472 0034 E668     		ldr	r6, [r4, #12]	@ unaligned
+ 473 0036 40F2F632 		movw	r2, #1014
+ 474 003a 04F11001 		add	r1, r4, #16
+ 475 003e 6846     		mov	r0, sp
+ 476 0040 FFF7FEFF 		bl	memcpy
+ 477              	.LVL29:
+ 478 0044 4846     		mov	r0, r9
+ 479 0046 4146     		mov	r1, r8
+ 480 0048 3A46     		mov	r2, r7
+ 481 004a 3346     		mov	r3, r6
+ 482 004c FFF7FEFF 		bl	queue_getSize
+ 483              	.LVL30:
+ 484 0050 0346     		mov	r3, r0
+ 485 0052 70B1     		cbz	r0, .L44
+  96:Core/Src/hmi_driver.c ****         if ((pFrame == 0) && (_data != FRAME_HEAD)) //丢失帧头全部丢弃
+ 486              		.loc 1 96 0
+ 487 0054 2046     		mov	r0, r4
+ 488 0056 FFF7FEFF 		bl	queue_pop
+ 489              	.LVL31:
+  97:Core/Src/hmi_driver.c ****         {
+ 490              		.loc 1 97 0
+ 491 005a 084B     		ldr	r3, .L48
+ 492 005c 1A88     		ldrh	r2, [r3]
+ 493 005e 002A     		cmp	r2, #0
+ 494 0060 D5D1     		bne	.L42
+  97:Core/Src/hmi_driver.c ****         {
+ 495              		.loc 1 97 0 is_stmt 0 discriminator 1
+ 496 0062 EE28     		cmp	r0, #238
+ 497 0064 D3D0     		beq	.L42
+ 498 0066 E0E7     		b	.L41
+ 499              	.LVL32:
+ 500              	.L47:
+ 501              	.LBB7:
+ 108:Core/Src/hmi_driver.c ****             quint16 frame_size = pFrame;
+ 502              		.loc 1 108 0 is_stmt 1
+ 503 0068 0022     		movs	r2, #0
+ 504 006a 0549     		ldr	r1, .L48+4
+ 505 006c 0A60     		str	r2, [r1]
+ 506              	.LVL33:
+ 110:Core/Src/hmi_driver.c ****             //crc16
+ 507              		.loc 1 110 0
+ 508 006e 0349     		ldr	r1, .L48
+ 509 0070 0A80     		strh	r2, [r1]	@ movhi
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 14
+
+
+ 510              	.LVL34:
+ 511              	.L44:
+ 512              	.LBE7:
+ 117:Core/Src/hmi_driver.c **** 
+ 513              		.loc 1 117 0
+ 514 0072 1846     		mov	r0, r3
+ 515 0074 0DF57F7D 		add	sp, sp, #1020
+ 516              	.LCFI24:
+ 517              		.cfi_def_cfa_offset 28
+ 518              		@ sp needed
+ 519 0078 BDE8F083 		pop	{r4, r5, r6, r7, r8, r9, pc}
+ 520              	.LVL35:
+ 521              	.L49:
+ 522              		.align	2
+ 523              	.L48:
+ 524 007c 00000000 		.word	.LANCHOR3
+ 525 0080 00000000 		.word	.LANCHOR4
+ 526              		.cfi_endproc
+ 527              	.LFE126:
+ 529              		.section	.text.process,"ax",%progbits
+ 530              		.align	1
+ 531              		.global	process
+ 532              		.syntax unified
+ 533              		.thumb
+ 534              		.thumb_func
+ 535              		.fpu fpv4-sp-d16
+ 537              	process:
+ 538              	.LFB130:
+ 211:Core/Src/hmi_driver.c **** 
+ 212:Core/Src/hmi_driver.c **** void process(quint8 *msg, const quint16 len)
+ 213:Core/Src/hmi_driver.c **** {
+ 539              		.loc 1 213 0
+ 540              		.cfi_startproc
+ 541              		@ args = 0, pretend = 0, frame = 1040
+ 542              		@ frame_needed = 0, uses_anonymous_args = 0
+ 543              	.LVL36:
+ 544 0000 30B5     		push	{r4, r5, lr}
+ 545              	.LCFI25:
+ 546              		.cfi_def_cfa_offset 12
+ 547              		.cfi_offset 4, -12
+ 548              		.cfi_offset 5, -8
+ 549              		.cfi_offset 14, -4
+ 550 0002 ADF6140D 		subw	sp, sp, #2068
+ 551              	.LCFI26:
+ 552              		.cfi_def_cfa_offset 2080
+ 553 0006 0446     		mov	r4, r0
+ 554 0008 0D46     		mov	r5, r1
+ 214:Core/Src/hmi_driver.c ****     Hmi_msg msg_t = {0};
+ 555              		.loc 1 214 0
+ 556 000a 4FF48262 		mov	r2, #1040
+ 557 000e 0021     		movs	r1, #0
+ 558              	.LVL37:
+ 559 0010 0DF58060 		add	r0, sp, #1024
+ 560              	.LVL38:
+ 561 0014 FFF7FEFF 		bl	memset
+ 562              	.LVL39:
+ 215:Core/Src/hmi_driver.c ****     //填充结构体
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 15
+
+
+ 216:Core/Src/hmi_driver.c ****     msg_t._head = msg[0];
+ 563              		.loc 1 216 0
+ 564 0018 2378     		ldrb	r3, [r4]	@ zero_extendqisi2
+ 565 001a 8DF80034 		strb	r3, [sp, #1024]
+ 217:Core/Src/hmi_driver.c ****     msg_t._cmd_type = GET_16BITS(msg[1], msg[2]);
+ 566              		.loc 1 217 0
+ 567 001e 6378     		ldrb	r3, [r4, #1]	@ zero_extendqisi2
+ 568 0020 A078     		ldrb	r0, [r4, #2]	@ zero_extendqisi2
+ 569 0022 40EA0320 		orr	r0, r0, r3, lsl #8
+ 570 0026 ADF80204 		strh	r0, [sp, #1026]	@ movhi
+ 218:Core/Src/hmi_driver.c ****     msg_t._screen_id = GET_16BITS(msg[3], msg[4]);
+ 571              		.loc 1 218 0
+ 572 002a E278     		ldrb	r2, [r4, #3]	@ zero_extendqisi2
+ 573 002c 2379     		ldrb	r3, [r4, #4]	@ zero_extendqisi2
+ 574 002e 43EA0223 		orr	r3, r3, r2, lsl #8
+ 575 0032 ADF80434 		strh	r3, [sp, #1028]	@ movhi
+ 219:Core/Src/hmi_driver.c ****     msg_t._widget_id = GET_16BITS(msg[5], msg[6]);
+ 576              		.loc 1 219 0
+ 577 0036 6279     		ldrb	r2, [r4, #5]	@ zero_extendqisi2
+ 578 0038 A379     		ldrb	r3, [r4, #6]	@ zero_extendqisi2
+ 579 003a 43EA0223 		orr	r3, r3, r2, lsl #8
+ 580 003e ADF80634 		strh	r3, [sp, #1030]	@ movhi
+ 220:Core/Src/hmi_driver.c ****     msg_t._widget_type = msg[7];
+ 581              		.loc 1 220 0
+ 582 0042 E379     		ldrb	r3, [r4, #7]	@ zero_extendqisi2
+ 583 0044 8DF80834 		strb	r3, [sp, #1032]
+ 584              	.LVL40:
+ 585              	.LBB8:
+ 221:Core/Src/hmi_driver.c ****     for (quint16 i = 0; i < (len - 12); i++)
+ 586              		.loc 1 221 0
+ 587 0048 0023     		movs	r3, #0
+ 588 004a 07E0     		b	.L51
+ 589              	.LVL41:
+ 590              	.L52:
+ 222:Core/Src/hmi_driver.c ****     {
+ 223:Core/Src/hmi_driver.c ****         msg_t._msg[i] = msg[i + 8];
+ 591              		.loc 1 223 0 discriminator 3
+ 592 004c E218     		adds	r2, r4, r3
+ 593 004e 117A     		ldrb	r1, [r2, #8]	@ zero_extendqisi2
+ 594 0050 0DF58062 		add	r2, sp, #1024
+ 595 0054 1A44     		add	r2, r2, r3
+ 596 0056 5172     		strb	r1, [r2, #9]
+ 221:Core/Src/hmi_driver.c ****     for (quint16 i = 0; i < (len - 12); i++)
+ 597              		.loc 1 221 0 discriminator 3
+ 598 0058 0133     		adds	r3, r3, #1
+ 599              	.LVL42:
+ 600 005a 9BB2     		uxth	r3, r3
+ 601              	.LVL43:
+ 602              	.L51:
+ 221:Core/Src/hmi_driver.c ****     for (quint16 i = 0; i < (len - 12); i++)
+ 603              		.loc 1 221 0 is_stmt 0 discriminator 1
+ 604 005c A5F10C02 		sub	r2, r5, #12
+ 605 0060 9342     		cmp	r3, r2
+ 606 0062 F3DB     		blt	.L52
+ 607              	.LBE8:
+ 224:Core/Src/hmi_driver.c ****     }
+ 225:Core/Src/hmi_driver.c ****     msg_t._tail = GET_32BITS(msg[len - 4], msg[len - 3], msg[len - 2], msg[len - 1]);
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 16
+
+
+ 608              		.loc 1 225 0 is_stmt 1
+ 609 0064 2C44     		add	r4, r4, r5
+ 610              	.LVL44:
+ 611 0066 14F8042C 		ldrb	r2, [r4, #-4]	@ zero_extendqisi2
+ 612 006a 14F8033C 		ldrb	r3, [r4, #-3]	@ zero_extendqisi2
+ 613              	.LVL45:
+ 614 006e 1B04     		lsls	r3, r3, #16
+ 615 0070 43EA0263 		orr	r3, r3, r2, lsl #24
+ 616 0074 14F8022C 		ldrb	r2, [r4, #-2]	@ zero_extendqisi2
+ 617 0078 43EA0223 		orr	r3, r3, r2, lsl #8
+ 618 007c 14F8012C 		ldrb	r2, [r4, #-1]	@ zero_extendqisi2
+ 619 0080 1343     		orrs	r3, r3, r2
+ 620 0082 CDF80C38 		str	r3, [sp, #2060]
+ 226:Core/Src/hmi_driver.c ****     /**********************************************************************************************
+ 227:Core/Src/hmi_driver.c **** #if DEBUG
+ 228:Core/Src/hmi_driver.c ****     printf(" msg_t._head = %x\n", msg_t._head);
+ 229:Core/Src/hmi_driver.c ****     printf(" msg_t._cmd_type = %x\n", msg_t._cmd_type);
+ 230:Core/Src/hmi_driver.c ****     printf(" msg_t._screen_id = %x\n", msg_t._screen_id);
+ 231:Core/Src/hmi_driver.c ****     printf(" msg_t._widget_id = %x\n", msg_t._widget_id);
+ 232:Core/Src/hmi_driver.c ****     printf(" msg_t._widget_type = %x\n", msg_t._widget_type);
+ 233:Core/Src/hmi_driver.c ****     printf("msg_t._msg[%d] = ", len - 12);
+ 234:Core/Src/hmi_driver.c ****     for (int i = 0; i < (len - 12); i++)
+ 235:Core/Src/hmi_driver.c ****     {
+ 236:Core/Src/hmi_driver.c ****         printf("%x ", msg_t._msg[i]);
+ 237:Core/Src/hmi_driver.c ****     }
+ 238:Core/Src/hmi_driver.c ****     printf("\n");
+ 239:Core/Src/hmi_driver.c ****     printf(" msg_t._tail = %lx\n", msg_t._tail);
+ 240:Core/Src/hmi_driver.c **** #endif
+ 241:Core/Src/hmi_driver.c **** 
+ 242:Core/Src/hmi_driver.c ****     switch (GET_HEIGH_8BITS(msg_t._cmd_type))
+ 621              		.loc 1 242 0
+ 622 0086 000A     		lsrs	r0, r0, #8
+ 623 0088 B128     		cmp	r0, #177
+ 624 008a 0CD1     		bne	.L50
+ 243:Core/Src/hmi_driver.c ****     {
+ 244:Core/Src/hmi_driver.c ****     case NOTIFY_TOUCH_PRESS: //触摸屏按下
+ 245:Core/Src/hmi_driver.c ****         ;
+ 246:Core/Src/hmi_driver.c ****         break;
+ 247:Core/Src/hmi_driver.c ****     case NOTIFY_TOUCH_RELEASE: //触摸屏松开
+ 248:Core/Src/hmi_driver.c ****         ;
+ 249:Core/Src/hmi_driver.c ****         break;
+ 250:Core/Src/hmi_driver.c ****     case NOTIFY_WRITE_FLASH_OK: //写FLASH成功
+ 251:Core/Src/hmi_driver.c ****         ;
+ 252:Core/Src/hmi_driver.c ****         break;
+ 253:Core/Src/hmi_driver.c ****     case NOTIFY_WRITE_FLASH_FAILD: //写FLASH失败
+ 254:Core/Src/hmi_driver.c ****         ;
+ 255:Core/Src/hmi_driver.c ****         break;
+ 256:Core/Src/hmi_driver.c ****     case NOTIFY_READ_FLASH_OK: //读取FLASH成功
+ 257:Core/Src/hmi_driver.c ****         ;
+ 258:Core/Src/hmi_driver.c ****         break;
+ 259:Core/Src/hmi_driver.c ****     case NOTIFY_READ_FLASH_FAILD: //读取FLASH失败
+ 260:Core/Src/hmi_driver.c ****         ;
+ 261:Core/Src/hmi_driver.c ****         break;
+ 262:Core/Src/hmi_driver.c ****     case NOTIFY_READ_RTC: //读取RTC时间
+ 263:Core/Src/hmi_driver.c ****         ;
+ 264:Core/Src/hmi_driver.c ****         break;
+ 265:Core/Src/hmi_driver.c ****     case NOTIFY_CONTROL:
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 17
+
+
+ 266:Core/Src/hmi_driver.c ****         process_notify(msg_t);
+ 625              		.loc 1 266 0
+ 626 008c 0DF58064 		add	r4, sp, #1024
+ 627 0090 4FF48062 		mov	r2, #1024
+ 628 0094 0DF58261 		add	r1, sp, #1040
+ 629 0098 6846     		mov	r0, sp
+ 630 009a FFF7FEFF 		bl	memcpy
+ 631              	.LVL46:
+ 632 009e 94E80F00 		ldm	r4, {r0, r1, r2, r3}
+ 633 00a2 FFF7FEFF 		bl	process_notify
+ 634              	.LVL47:
+ 635              	.L50:
+ 267:Core/Src/hmi_driver.c ****         break;
+ 268:Core/Src/hmi_driver.c ****     case NOTIFY_HandShake: //握手通知
+ 269:Core/Src/hmi_driver.c ****         // NOTIFYHandShake();
+ 270:Core/Src/hmi_driver.c ****         break;
+ 271:Core/Src/hmi_driver.c ****     default:
+ 272:Core/Src/hmi_driver.c ****         break;
+ 273:Core/Src/hmi_driver.c ****     }
+ 274:Core/Src/hmi_driver.c **** }...
+ 636              		.loc 1 274 0
+ 637 00a6 0DF6140D 		addw	sp, sp, #2068
+ 638              	.LCFI27:
+ 639              		.cfi_def_cfa_offset 12
+ 640              		@ sp needed
+ 641 00aa 30BD     		pop	{r4, r5, pc}
+ 642              		.cfi_endproc
+ 643              	.LFE130:
+ 645              		.global	ctrl
+ 646              		.global	voltage
+ 647              		.global	phase
+ 648              		.section	.bss._tail.8879,"aw",%nobits
+ 649              		.align	2
+ 650              		.set	.LANCHOR4,. + 0
+ 653              	_tail.8879:
+ 654 0000 00000000 		.space	4
+ 655              		.section	.bss.ctrl,"aw",%nobits
+ 656              		.set	.LANCHOR0,. + 0
+ 659              	ctrl:
+ 660 0000 00       		.space	1
+ 661              		.section	.bss.pFrame.8878,"aw",%nobits
+ 662              		.align	1
+ 663              		.set	.LANCHOR3,. + 0
+ 666              	pFrame.8878:
+ 667 0000 0000     		.space	2
+ 668              		.section	.bss.phase,"aw",%nobits
+ 669              		.align	2
+ 670              		.set	.LANCHOR2,. + 0
+ 673              	phase:
+ 674 0000 00000000 		.space	4
+ 675              		.section	.bss.voltage,"aw",%nobits
+ 676              		.align	2
+ 677              		.set	.LANCHOR1,. + 0
+ 680              	voltage:
+ 681 0000 00000000 		.space	4
+ 682              		.section	.rodata.hmi_button_press.str1.4,"aMS",%progbits,1
+ 683              		.align	2
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 18
+
+
+ 684              	.LC0:
+ 685 0000 6F757470 		.ascii	"output enable.\000"
+ 685      75742065 
+ 685      6E61626C 
+ 685      652E00
+ 686 000f 00       		.space	1
+ 687              	.LC1:
+ 688 0010 6F757470 		.ascii	"output disable.\000"
+ 688      75742064 
+ 688      69736162 
+ 688      6C652E00 
+ 689              		.section	.rodata.process_notify.str1.4,"aMS",%progbits,1
+ 690              		.align	2
+ 691              	.LC2:
+ 692 0000 6368616E 		.ascii	"change screen\000"
+ 692      67652073 
+ 692      63726565 
+ 692      6E00
+ 693              		.text
+ 694              	.Letext0:
+ 695              		.file 2 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\include
+ 696              		.file 3 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\include
+ 697              		.file 4 "Drivers/CMSIS/Include/core_cm4.h"
+ 698              		.file 5 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/system_stm32f4xx.h"
+ 699              		.file 6 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f429xx.h"
+ 700              		.file 7 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h"
+ 701              		.file 8 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h"
+ 702              		.file 9 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h"
+ 703              		.file 10 "Core/Inc/array_queue.h"
+ 704              		.file 11 "Core/Inc/hmi_driver.h"
+ 705              		.file 12 "Core/Inc/usart.h"
+ 706              		.file 13 "Core/Inc/utility.h"
+ 707              		.file 14 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\includ
+ 708              		.file 15 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\includ
+ 709              		.file 16 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\lib\\gcc\\arm-none-ea
+ 710              		.file 17 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\includ
+ 711              		.file 18 "c:\\msys64\\home\\63143\\gcc-arm-none-eabi-7-2018-q2-update-win32\\arm-none-eabi\\includ
+ 712              		.file 19 "<built-in>"
+ARM GAS  C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s 			page 19
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 hmi_driver.c
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:18     .text.send_word_uint8:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:24     .text.send_word_uint8:00000000 send_word_uint8
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:58     .text.send_word_uint8:0000001c $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:63     .text.hmi_button_press:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:69     .text.hmi_button_press:00000000 hmi_button_press
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:137    .text.hmi_button_press:00000044 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:145    .text.hmi_text_set:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:151    .text.hmi_text_set:00000000 hmi_text_set
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:217    .text.hmi_text_set:00000054 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:223    .text.process_notify:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:229    .text.process_notify:00000000 process_notify
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:311    .text.process_notify:0000006c $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:316    .text.send_string_uint8:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:323    .text.send_string_uint8:00000000 send_string_uint8
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:364    .text.send_string_uint16:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:371    .text.send_string_uint16:00000000 send_string_uint16
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:417    .text.queue_find_frame:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:424    .text.queue_find_frame:00000000 queue_find_frame
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:524    .text.queue_find_frame:0000007c $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:530    .text.process:00000000 $t
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:537    .text.process:00000000 process
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:659    .bss.ctrl:00000000 ctrl
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:680    .bss.voltage:00000000 voltage
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:673    .bss.phase:00000000 phase
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:649    .bss._tail.8879:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:653    .bss._tail.8879:00000000 _tail.8879
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:660    .bss.ctrl:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:662    .bss.pFrame.8878:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:666    .bss.pFrame.8878:00000000 pFrame.8878
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:669    .bss.phase:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:676    .bss.voltage:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:683    .rodata.hmi_button_press.str1.4:00000000 $d
+C:\Users\63143\AppData\Local\Temp\ccqGnGjB.s:690    .rodata.process_notify.str1.4:00000000 $d
+
+UNDEFINED SYMBOLS
+HAL_UART_Transmit
+huart3
+puts
+__aeabi_d2f
+atof
+memcpy
+queue_getSize
+queue_pop
+memset

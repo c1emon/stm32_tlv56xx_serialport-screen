@@ -39,12 +39,14 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
+#include "utility.h"
 #include "arm_math.h" //enable dsp lib
 #include "gpio.h"
 #include "usart.h"
 #include "tim.h"
 #include "TLV56xx.h"
 #include "array_queue.h"
+#include "hmi_driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,7 +54,10 @@
 extern UART_HandleTypeDef huart3;
 extern Queue myqueue;
 extern uint8_t uart3_rev_cache[10];
-extern uint16_t counter;
+// extern uint16_t counter;
+extern quint8 ctrl;
+extern float phase;
+extern float voltage;
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -284,13 +289,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM3)
   {
     t_ms += T; //计时器
-    uint16_t val1 = (uint16_t)(2500 * arm_sin_f32(2 * PI * 50 * t_ms + 0) + 2500);
-    uint16_t val2 = (uint16_t)(2500 * arm_sin_f32(2 * PI * 50 * t_ms + 2 * PI / 3) + 2500);
-    uint16_t val3 = (uint16_t)(2500 * arm_sin_f32(2 * PI * 50 * t_ms - 2 * PI / 3) + 2500);
+    if (ctrl)
+    {
+      uint16_t val1 = (uint16_t)(VOLTAGE_CONV(voltage) * arm_sin_f32(2 * PI * 50 * t_ms + 0 + DEG2RAD(phase)) + 2500);
+      uint16_t val2 = (uint16_t)(VOLTAGE_CONV(voltage) * arm_sin_f32(2 * PI * 50 * t_ms + 2 * PI / 3 + DEG2RAD(phase)) + 2500);
+      uint16_t val3 = (uint16_t)(VOLTAGE_CONV(voltage) * arm_sin_f32(2 * PI * 50 * t_ms - 2 * PI / 3 + DEG2RAD(phase)) + 2500);
 
-    TLV56xx_WriteChannelVoltage(ch1, val1);
-    TLV56xx_WriteChannelVoltage(ch2, val2);
-    TLV56xx_WriteChannelVoltage(ch3, val3);
+      TLV56xx_WriteChannelVoltage(ch1, val1);
+      TLV56xx_WriteChannelVoltage(ch2, val2);
+      TLV56xx_WriteChannelVoltage(ch3, val3);
+    }
+    else
+    {
+      TLV56xx_WriteChannelVoltage(ch1, 0);
+      TLV56xx_WriteChannelVoltage(ch2, 0);
+      TLV56xx_WriteChannelVoltage(ch3, 0);
+    }
+    
   }
 }
 
