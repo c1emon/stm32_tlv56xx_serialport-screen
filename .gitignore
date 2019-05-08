@@ -51,4 +51,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-.vscode/
+
+# project conf cache
+.vscode/ipch/*
