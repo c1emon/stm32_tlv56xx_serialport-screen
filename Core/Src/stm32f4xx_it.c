@@ -301,9 +301,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
     else
     {
-      TLV56xx_WriteChannelVoltage(ch1, 0);
-      TLV56xx_WriteChannelVoltage(ch2, 0);
-      TLV56xx_WriteChannelVoltage(ch3, 0);
+      TLV56xx_WriteChannelVoltage(ch1, 2500);
+      TLV56xx_WriteChannelVoltage(ch2, 2500);
+      TLV56xx_WriteChannelVoltage(ch3, 2500);
     }
     
   }
