@@ -2,7 +2,7 @@
 #include "usart.h"
 #include "utility.h"
 #include <stdlib.h>
-// #include "crc16.h"
+#include "crc16.h"
 
 //group1
 float phase = 0;
@@ -55,6 +55,9 @@ typedef struct _msg_type
     quint16 _widget_id;
     quint8 _widget_type;
     quint8 _msg[MAX_MSG_LENGTH];
+#if _CRC16
+    quint16 _crc_val;
+#endif
     quint32 _tail;
 } Hmi_msg;
 /********************************************************************************/
@@ -107,8 +110,28 @@ quint16 queue_find_frame(Queue *queue, quint8 *frame)
         {
             _tail = 0;
             quint16 frame_size = pFrame;
+
+//crc16
+#if _CRC16
+            if (CRC16(frame + 1, frame_size - 7) == GET_16BITS(frame[frame_size - 6], frame[frame_size - 5]))
+            {
+#ifdef DEBUG
+                printf("CRC SUCCESS.\n");
+#endif
+                pFrame = 0;
+                return frame_size;
+            }
+            else
+            {
+#ifdef DEBUG
+                printf("CRC ERR.\n");
+#endif
+                pFrame = 0;
+                return 0;
+            }
+            
+#endif
             pFrame = 0;
-            //crc16
             return frame_size;
         }
     }
@@ -218,25 +241,47 @@ void process(quint8 *msg, const quint16 len)
     msg_t._screen_id = GET_16BITS(msg[3], msg[4]);
     msg_t._widget_id = GET_16BITS(msg[5], msg[6]);
     msg_t._widget_type = msg[7];
+
+#if _CRC16
+    for (quint16 i = 0; i < (len - 12 - 2); i++)
+    {
+        msg_t._msg[i] = msg[i + 8];
+    }
+    msg_t._crc_val = GET_16BITS(msg[len - 6], msg[len - 5]);
+#else
     for (quint16 i = 0; i < (len - 12); i++)
     {
         msg_t._msg[i] = msg[i + 8];
     }
+#endif
+
     msg_t._tail = GET_32BITS(msg[len - 4], msg[len - 3], msg[len - 2], msg[len - 1]);
     /************************************************************************************************/
 #if DEBUG
-    printf(" msg_t._head = %x\n", msg_t._head);
-    printf(" msg_t._cmd_type = %x\n", msg_t._cmd_type);
-    printf(" msg_t._screen_id = %x\n", msg_t._screen_id);
-    printf(" msg_t._widget_id = %x\n", msg_t._widget_id);
-    printf(" msg_t._widget_type = %x\n", msg_t._widget_type);
+    printf("msg_t._head = %x\n", msg_t._head);
+    printf("msg_t._cmd_type = %x\n", msg_t._cmd_type);
+    printf("msg_t._screen_id = %x\n", msg_t._screen_id);
+    printf("msg_t._widget_id = %x\n", msg_t._widget_id);
+    printf("msg_t._widget_type = %x\n", msg_t._widget_type);
+
+#if _CRC16
+    printf("msg_t._msg[%d] = ", len - 12 - 2);
+    for (int i = 0; i < (len - 12 - 2); i++)
+    {
+        printf("%x ", msg_t._msg[i]);
+    }
+    printf("\n");
+    printf("msg_t._crc_val = %x\n", msg_t._crc_val);
+#else
     printf("msg_t._msg[%d] = ", len - 12);
     for (int i = 0; i < (len - 12); i++)
     {
         printf("%x ", msg_t._msg[i]);
     }
     printf("\n");
-    printf(" msg_t._tail = %lx\n", msg_t._tail);
+#endif
+
+    printf("msg_t._tail = %lx\n", msg_t._tail);
 #endif
 
     switch (GET_HEIGH_8BITS(msg_t._cmd_type))
