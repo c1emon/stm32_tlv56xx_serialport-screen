@@ -26,7 +26,7 @@ void TLV56xx_GPIO_Init()
 
     HAL_Delay(50);
 
-    TLV56xx_WriteAll(0);
+    TLV56xx_WriteAll(2047);
 }
 
 void TLV56xx_Write(const uint16_t cmd)
