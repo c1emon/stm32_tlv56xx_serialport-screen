@@ -288,6 +288,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   {
 
     t_ms += T; //计时器
+    if (t_ms > 1000000)
+    {
+      t_ms = 0;
+    }
 
     output(t_ms, group_setting_t);
   }

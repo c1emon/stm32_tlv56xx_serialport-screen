@@ -8,7 +8,7 @@ extern "C"
 #include "main.h"
 #include "array_queue.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define _CRC16 0
 
 #define MAX_MSG_LENGTH 1024

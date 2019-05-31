@@ -7,8 +7,7 @@ u_float32 amp_voltage = 10.000;
 u_float32 amp_voltage_temp = 0;
 
 /**************************************************************************************************/
-static void
-screen1_button(const Hmi_msg msg_t)
+static void screen1_button(const Hmi_msg msg_t)
 {
     switch (msg_t._widget_id)
     {
@@ -43,7 +42,7 @@ screen1_button(const Hmi_msg msg_t)
     }
 }
 
-static void screen0_button(const Hmi_msg msg_t)
+static void screen2_button(const Hmi_msg msg_t)
 {
     switch (msg_t._widget_id)
     {
@@ -64,12 +63,11 @@ void hmi_button_press(const Hmi_msg msg_t)
 {
     switch (msg_t._screen_id)
     {
-
     case 1:
         screen1_button(msg_t);
         break;
     case 2:
-        screen0_button(msg_t);
+        screen2_button(msg_t);
         break;
 
     default:
@@ -160,7 +158,7 @@ static void screen1_text(const Hmi_msg msg_t)
     }
 }
 
-static void screen0_text(const Hmi_msg msg_t)
+static void screen2_text(const Hmi_msg msg_t)
 {
     switch (msg_t._widget_id)
     {
@@ -182,7 +180,7 @@ void hmi_text_set(const Hmi_msg msg_t)
         screen1_text(msg_t);
         break;
     case 2:
-        screen0_text(msg_t);
+        screen2_text(msg_t);
         break;
 
     default:

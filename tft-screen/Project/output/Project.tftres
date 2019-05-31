@@ -1,0 +1,20 @@
+<Resource>
+    <pages>
+        <page name="main" id="0" />
+        <page name="experiment" id="1" />
+        <page name="settings" id="2" />
+    </pages>
+    <images>
+        <image id="0" url="c:\users\63143\desktop\tft-screen-test\project\Images\background2.png" width="1024" height="600" crop="0" effect_left="0" effect_top="0" effect_width="1024" effect_height="600" size="1228800" />
+        <image id="1" url="c:\users\63143\desktop\tft-screen-test\project\Images\1.png" width="141" height="141" crop="0" effect_left="0" effect_top="0" effect_width="141" effect_height="141" size="39762" />
+        <image id="2" url="c:\users\63143\desktop\tft-screen-test\project\Images\2.png" width="141" height="141" crop="0" effect_left="0" effect_top="0" effect_width="141" effect_height="141" size="39762" />
+        <image id="3" url="c:\users\63143\desktop\tft-screen-test\project\Images\boom.png" width="100" height="50" crop="0" effect_left="0" effect_top="0" effect_width="100" effect_height="50" size="10000" />
+        <image id="4" url="c:\users\63143\desktop\tft-screen-test\project\Images\settings.png" width="100" height="50" crop="0" effect_left="0" effect_top="0" effect_width="100" effect_height="50" size="10000" />
+        <image id="5" url="c:\users\63143\desktop\tft-screen-test\project\Images\background3.png" width="1024" height="600" crop="0" effect_left="0" effect_top="0" effect_width="1024" effect_height="600" size="1228800" />
+        <image id="6" url="c:\users\63143\desktop\tft-screen-test\project\Images\back.png" width="100" height="74" crop="0" effect_left="0" effect_top="0" effect_width="100" effect_height="74" size="14800" />
+        <image id="7" url="c:\users\63143\desktop\tft-screen-test\project\Images\start.png" width="65" height="65" crop="0" effect_left="0" effect_top="0" effect_width="65" effect_height="65" size="8450" />
+        <image id="8" url="c:\users\63143\desktop\tft-screen-test\project\Images\stop.png" width="65" height="65" crop="0" effect_left="0" effect_top="0" effect_width="65" effect_height="65" size="8450" />
+        <image id="9" url="c:\users\63143\desktop\tft-screen-test\project\Images\确认.png" width="64" height="64" crop="0" effect_left="0" effect_top="0" effect_width="64" effect_height="64" size="8192" />
+    </images>
+    <waves />
+</Resource>

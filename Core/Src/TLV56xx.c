@@ -168,7 +168,6 @@ void output(const u_float64 t_ms, Group_setting *Group_setting_t)
         else
         {
             a = VOLTAGE_MAP(Group_setting_t[1].voltage[0], amp_voltage) + 2500;
-
         }
         //ch11
         if (Group_setting_t[1].freq[1] != 0)

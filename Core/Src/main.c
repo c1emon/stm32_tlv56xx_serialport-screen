@@ -116,7 +116,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM2_Init();
   TLV56xx_GPIO_Init();
-  DA_TIM3_Init(90, 100);
+  DA_TIM3_Init(90, 200);
   queue_Init(&myqueue);
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
