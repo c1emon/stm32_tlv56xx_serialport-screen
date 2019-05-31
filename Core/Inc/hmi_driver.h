@@ -13,12 +13,24 @@ extern "C"
 
 #define MAX_MSG_LENGTH 1024
 
-    extern float phase;
-    extern float voltage;
-    extern quint8 ctrl;
 
-    quint16
-    queue_find_frame(Queue *queue, quint8 *frame);
+
+    //message prase
+    typedef struct _msg_type
+    {
+        quint8 _head;
+        quint16 _cmd_type;
+        quint16 _screen_id;
+        quint16 _widget_id;
+        quint8 _widget_type;
+        quint8 _msg[MAX_MSG_LENGTH];
+#if _CRC16
+        quint16 _crc_val;
+#endif
+        quint32 _tail;
+    } Hmi_msg;
+
+    quint16 queue_find_frame(Queue *queue, quint8 *frame);
     void process(quint8 *msg, const quint16 len);
 
 #ifdef __cplusplus

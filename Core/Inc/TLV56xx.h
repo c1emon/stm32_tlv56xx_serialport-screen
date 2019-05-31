@@ -9,6 +9,8 @@ extern "C"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_gpio.h"
 #include <stdbool.h>
+#include "utility.h"
+#include "hmi_cmd.h"
 
 //UNUSED PINS P.C-11.12.13
 #define GPIOTLV GPIOC
@@ -42,7 +44,9 @@ extern "C"
         uint8_t DACPairSpeed;
     };
 
-#define VOLTAGE_REF_VAL (uint16_t)5000
+
+
+#define VOLTAGE_REF_VAL (u_uint16)5000
 
 #define fullDeviceOn false
 #define fullDeviceOff true
@@ -70,11 +74,12 @@ extern "C"
     };
 
     void TLV56xx_GPIO_Init();
-    void TLV56xx_Write(const uint16_t cmd);
+    void TLV56xx_Write(const u_uint16 cmd);
     void TLV56xx_Update(void);
-    void TLV56xx_WriteAll(const uint16_t val);
-    void TLV56xx_WriteChannelDAC(enum channel ch, const uint16_t val);
-    void TLV56xx_WriteChannelVoltage(enum channel ch, const uint16_t voltage_mv);
+    void TLV56xx_WriteAll(const u_uint16 val);
+    void TLV56xx_WriteChannelDAC(enum channel ch, const u_uint16 val);
+    void TLV56xx_WriteChannelVoltage(enum channel ch, const u_uint16 voltage_mv);
+    void output(const u_float64 t_ms, Group_setting *Group_setting_t);
 
 #ifdef __cplusplus
 }

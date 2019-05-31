@@ -64,7 +64,8 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c \
 Core/Src/system_stm32f4xx.c \
 Core/Src/TLV56xx.c \
 Core/Src/array_queue.c \
-Core/Src/hmi_driver.c
+Core/Src/hmi_driver.c \
+Core/Src/hmi_cmd.c
 
 # ASM sources
 ASM_SOURCES =  \

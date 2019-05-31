@@ -53,6 +53,8 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 extern Queue myqueue;
+uint8_t frame_cache[1024] = {0};
+uint8_t frame_len = 0;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -114,23 +116,22 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM2_Init();
   TLV56xx_GPIO_Init();
-  DA_TIM3_Init(90, 50);
+  DA_TIM3_Init(90, 100);
   queue_Init(&myqueue);
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   printf("system boot success.\n");
   /* USER CODE END 2 */
   /* Infinite loop */
-  uint8_t str[1024] = {0};
-  uint8_t len;
+
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-    len = queue_find_frame(&myqueue, str);
-    if (len)
+    frame_len = queue_find_frame(&myqueue, frame_cache);
+    if (frame_len)
     {
-      process(str, len);
+      process(frame_cache, frame_len);
     }
     /* USER CODE BEGIN 3 */
   }

@@ -1,13 +1,9 @@
 #include "hmi_driver.h"
 #include "usart.h"
 #include "utility.h"
-#include <stdlib.h>
 #include "crc16.h"
+#include "hmi_cmd.h"
 
-//group1
-float phase = 0;
-float voltage = 0;
-quint8 ctrl = 0;
 //frame args
 #define FRAME_HEAD 0XEE
 #define FRAME_TAIL 0XFFFCFFFF
@@ -46,20 +42,7 @@ enum CtrlType
     kCtrlQRCode,        //二维码
 };
 
-//message prase
-typedef struct _msg_type
-{
-    quint8 _head;
-    quint16 _cmd_type;
-    quint16 _screen_id;
-    quint16 _widget_id;
-    quint8 _widget_type;
-    quint8 _msg[MAX_MSG_LENGTH];
-#if _CRC16
-    quint16 _crc_val;
-#endif
-    quint32 _tail;
-} Hmi_msg;
+
 /********************************************************************************/
 extern UART_HandleTypeDef huart3;
 #define pserialPort (&huart3)
@@ -129,7 +112,7 @@ quint16 queue_find_frame(Queue *queue, quint8 *frame)
                 pFrame = 0;
                 return 0;
             }
-            
+
 #endif
             pFrame = 0;
             return frame_size;
@@ -137,58 +120,6 @@ quint16 queue_find_frame(Queue *queue, quint8 *frame)
     }
 
     return 0;
-}
-
-static void hmi_button_press(const Hmi_msg msg_t)
-{
-    switch (msg_t._screen_id)
-    {
-    case 0:
-        if (msg_t._widget_id == 3)
-        {
-            if (msg_t._msg[1])
-            { //按钮按下
-                ctrl = 1;
-                printf("output enable.\n");
-            }
-            else
-            { //按钮弹起
-                ctrl = 0;
-                printf("output disable.\n");
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-}
-
-static void hmi_text_set(const Hmi_msg msg_t)
-{
-    switch (msg_t._screen_id)
-    {
-    case 0:
-        if (msg_t._widget_id == 1)
-        {
-            voltage = atof(msg_t._msg);
-#if DEBUG
-            printf("voltage = %.2lf V\n", voltage);
-#endif
-        }
-        else if (msg_t._widget_id == 2)
-        {
-            phase = atof(msg_t._msg);
-#if DEBUG
-            printf("phase = %.2f deg\n", phase);
-#endif
-        }
-
-        break;
-
-    default:
-        break;
-    }
 }
 
 static void process_notify(const Hmi_msg msg_t)
@@ -199,7 +130,6 @@ static void process_notify(const Hmi_msg msg_t)
     }
     else
     {
-        // switch (GET_LOW_8BITS(msg_t._cmd_type))
         switch (msg_t._widget_type)
         {
         case kCtrlButton: //按钮控件
@@ -283,6 +213,7 @@ void process(quint8 *msg, const quint16 len)
 
     printf("msg_t._tail = %lx\n", msg_t._tail);
 #endif
+    /************************************************************************************************/
 
     switch (GET_HEIGH_8BITS(msg_t._cmd_type))
     {
